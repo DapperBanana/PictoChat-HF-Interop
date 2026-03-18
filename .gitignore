@@ -1,0 +1,6 @@
+secrets.local
+*.pcap
+*.pcapng
+/remote_*.txt
+/remote_*.md
+.claude/
