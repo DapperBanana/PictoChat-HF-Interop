@@ -4,3 +4,5 @@ secrets.local
 /remote_*.txt
 /remote_*.md
 .claude/
+sniff_out*.txt
+sniff_full*.txt
