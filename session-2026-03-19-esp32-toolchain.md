@@ -128,22 +128,29 @@ PictoThing uses `defmt` for all logging. This means serial output is binary-enco
 and not human-readable. Raw serial shows all `\n` bytes (defmt framing). To decode:
 
 ```bash
-# On vessel-01:
+# On vessel-01 — CORRECT command (chip already running, skip ROM sync):
 . ~/.cargo/env && . ~/export-esp.sh
-espflash monitor --port /dev/ttyUSB0 \
+sudo fuser -k /dev/ttyUSB0 && sleep 0.5
+espflash monitor --before no-reset-no-sync \
+  --port /dev/ttyUSB0 \
   --elf ~/foa_dswifi/target/xtensa-esp32-none-elf/release/PictoThing
 ```
 
-Problem encountered: `espflash monitor` hangs on "Connecting..." after the flash
-step (serial port contention). **Kill any process using ttyUSB0 first:**
+**Why `--before no-reset-no-sync`:** The default `--before default-reset` tries to
+pull the chip into ROM bootloader mode via DTR/RTS then sync. When the chip is already
+running firmware and hasn't been put in download mode, this hangs indefinitely.
+`no-reset-no-sync` skips both steps and just opens the serial stream — defmt decode
+still works because it's purely a software decode of the byte stream (doesn't need
+ROM communication).
+
+**To capture boot messages specifically:** DTR-toggle reset first, then immediately
+run monitor:
 ```bash
-sudo fuser -k /dev/ttyUSB0 && sleep 1
-espflash monitor --port /dev/ttyUSB0 --elf ...
+python3 -c "import serial,time; s=serial.Serial('/dev/ttyUSB0',115200); s.setDTR(False); s.setRTS(True); time.sleep(0.1); s.setDTR(True); s.setRTS(False); s.close()"
+espflash monitor --before no-reset-no-sync --port /dev/ttyUSB0 --elf ~/foa_dswifi/target/.../PictoThing
 ```
 
-Note: `espflash monitor` with `--elf` uses `defmt-print` to decode the binary log.
-Without `--elf`, output is garbage. The `--elf` flag is only supported on the
-`monitor` subcommand, not `flash`.
+Note: `--elf` is only on the `monitor` subcommand, not `flash`.
 
 ---
 
