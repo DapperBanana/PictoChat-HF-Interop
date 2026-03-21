@@ -6,7 +6,7 @@ Full hardware and software architecture for the PictoChat-HF relay system. Cover
 
 ## Hardware Architecture
 
-### Current State (Phase 1 complete, Phase 2a in progress)
+### Current State (Phase 2b complete — ESP32 hosting DS, bidirectional echo verified)
 
 ```mermaid
 graph LR
@@ -249,7 +249,7 @@ sequenceDiagram
 | :--- | :--- | :--- | :--- |
 | Raspberry Pi 4 | A | — | Deployed (vessel-01) |
 | AR9271 USB WiFi | A | USB → wlan1 | Present |
-| ESP32-WROOM-32 | A | USB → /dev/ttyUSB0 | **On order** |
+| ESP32-WROOM-32 | A | USB → /dev/ttyUSB0 | Deployed (vessel-01) |
 | HackRF One | A | USB | Not acquired |
 | EFHW antenna | A | RF coax | Not acquired |
 | DS Lite | A | 2.4 GHz to ESP32 | Present |
@@ -271,3 +271,59 @@ sequenceDiagram
 | Nintendo multicast host→client | `03:09:bf:00:00:00` |
 | Nintendo multicast client→host | `03:09:bf:00:00:10` |
 | Nintendo multicast host ACK | `03:09:bf:00:00:03` |
+| ESP32 host MAC (Node A) | `a4:f0:0f:61:9f:b0` |
+| Text message canvas size | 2048 bytes (assembled from 13×172 + 1×16 byte type-2 fragments) |
+| Drawing canvas size | 10240 bytes (5 pages × 2048) |
+| Last fragment marker | `transfer_flags == 1` (byte 7 in raw type-2 frame) |
+| End-of-burst flag | `HostToClientFlags` bit 7 (0x80) — must be set on last echoed/sent fragment |
+
+---
+
+## Message Relay Protocol
+
+### Relay unit: `MessagePayload`
+
+The assembled `MessagePayload` from `pictochat_application.rs` is the relay unit passed
+between nodes. It is DS-agnostic — any DS that joins and sends a message produces the same
+format:
+
+| Field | Size | Notes |
+| :--- | :--- | :--- |
+| magic | 1 byte | fixed |
+| subtype | 1 byte | 0 = text+drawing, 1 = identity |
+| from | 6 bytes | set to **destination node's host MAC** before sending to DS |
+| magic_1 | 14 bytes | fixed |
+| safezone | 14 bytes | fixed |
+| message | 2048 or 10240 bytes | PictoChat canvas bitmap |
+
+The `from` field is overwritten with the local host MAC at each relay hop so the receiving
+DS accepts the message as originating from its room host.
+
+### Inter-node TCP framing (implemented in `server_connection_task`, `main.rs`)
+
+```
+┌──────────┬──────────────┬──────────────────────────┐
+│ type (1B)│ length (2B BE)│ payload (length bytes)   │
+└──────────┴──────────────┴──────────────────────────┘
+
+type 0x00 = handshake (no payload)
+type 0xFD = data (payload = serialized MessagePayload)
+type 0xAD = error
+```
+
+### Phase 3 relay path
+
+```
+Node A DS → ESP32 inbound_queue → serialize → TCP 0xFD frame → relay server / HF bridge
+                                                                        ↓
+Node B DS ← ESP32 outbound_queue ← set from=hostMAC ← deserialize ← TCP 0xFD frame
+```
+
+For pre-HF testing: relay server is a simple TCP forwarding process on the internet.
+For HF: Pi replaces TCP relay — reads serial from ESP32, encapsulates for HackRF TX.
+
+### Main loop changes required (Phase 3)
+
+1. Spawn `server_connection_task` in `main()`
+2. Route `inbound_queue` messages to the TCP send channel instead of `outbound_queue`
+3. Add a third `select` arm receiving from the TCP receive channel → `outbound_queue`

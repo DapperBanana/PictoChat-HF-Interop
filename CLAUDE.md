@@ -14,8 +14,8 @@ See `architecture.md` for full hardware/software diagrams. Session notes are in 
 | :--- | :--- | :--- |
 | 1 | Reverse-engineer PictoChat beacon and data frames | **Complete** ✅ |
 | 2a | Phantom DS via AR9271 dual-interface (station+monitor) | **In progress — experimental** |
-| 2b | Phantom DS via ESP32 (foa_dswifi) — primary path | **Blocked — ESP32 on order** |
-| 3 | HF encapsulation + HackRF One integration | Not started |
+| 2b | Phantom DS via ESP32 (foa_dswifi) — primary path | **Complete** ✅ |
+| 3 | HF encapsulation + HackRF One integration | **In progress — relay framework designed** |
 | 4 | Multi-node field test (AB ↔ BC) | Not started |
 
 ## Hardware Per Node
@@ -23,7 +23,7 @@ See `architecture.md` for full hardware/software diagrams. Session notes are in 
 | Component | Role | Status |
 | :--- | :--- | :--- |
 | Raspberry Pi 4/5 | Central coordinator, HF bridge, serial bus | Deployed (vessel-01) |
-| ESP32-WROOM-32 (ELEGOO 2-pack) | 2.4 GHz Phantom DS — 802.11b with hardware ACKs | **On order** |
+| ESP32-WROOM-32 (ELEGOO 2-pack) | 2.4 GHz Phantom DS — 802.11b with hardware ACKs | Deployed (vessel-01) |
 | AR9271 USB WiFi adapter (wlan1) | 2.4 GHz sniffing / dual-interface experiment | Present on vessel-01 |
 | HackRF One | HF TX/RX (SDR, used with upconverter on 40m/20m) | Not yet acquired |
 | Nintendo DS Lite | User interface — signal source and sink | Present |
